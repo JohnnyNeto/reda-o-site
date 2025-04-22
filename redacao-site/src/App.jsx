@@ -1,39 +1,53 @@
-import { useState,useEffect } from 'react';
-import { } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
-import ImageUpload from './components/ImageUpload';
-import EssayForm from './components/EssayForm';
-
-const TURMA_SENHAS = {
-  turmaA: 'alunoA',
-  turmaB: 'alunoB',
-  turmaC: 'alunoC',
-};
+import ProfessorPage from './components/ProfessorPage';
+import AlunoPage from './components/AlunoPage';
 
 function App() {
-  useEffect(() => {
-    async function fetchImage() {
-      const res = await axios.get('http://localhost:3001/imagem');
-      if (res.data?.url) {
-        setImageURL(res.data.url);
-      }
-    }
-    fetchImage();
-  }, []);
-  
   const [userType, setUserType] = useState(null); // 'professor' ou 'aluno'
   const [loggedIn, setLoggedIn] = useState(false);
   const [senha, setSenha] = useState('');
   const [turmaSelecionada, setTurmaSelecionada] = useState('');
+  const [nomeAluno, setNomeAluno] = useState('');
   const [imageURL, setImageURL] = useState(null);
+  const [salas, setSalas] = useState({});
+
+  useEffect(() => {
+    async function fetchImage() {
+      try {
+        const res = await axios.get('http://localhost:3001/imagem');
+        if (res.data?.url) {
+          setImageURL(res.data.url);
+        }
+      } catch (err) {
+        console.error('Erro ao buscar imagem:', err);
+      }
+    }
+    fetchImage();
+  }, []);
 
   const handleLogin = () => {
-    if (userType === 'professor' && senha === 'prof123') {
+    if (userType === 'aluno') {
+      const sala = salas[turmaSelecionada];
+      if (sala && sala.senha === senha) {
+        if (!sala.alunos.some((a) => a.nome === nomeAluno)) {
+          setSalas((prev) => ({
+            ...prev,
+            [turmaSelecionada]: {
+              ...prev[turmaSelecionada],
+              alunos: [
+                ...prev[turmaSelecionada].alunos,
+                { nome: nomeAluno, entregou: false }
+              ]
+            }
+          }));
+        }
+        setLoggedIn(true);
+      } else {
+        alert('Senha incorreta ou sala inexistente');
+      }
+    } else if (userType === 'professor') {
       setLoggedIn(true);
-    } else if (userType === 'aluno' && TURMA_SENHAS[turmaSelecionada] === senha) {
-      setLoggedIn(true);
-    } else {
-      alert('Senha incorreta');
     }
   };
 
@@ -42,7 +56,34 @@ function App() {
     setLoggedIn(false);
     setSenha('');
     setTurmaSelecionada('');
+    setNomeAluno('');
     setImageURL(null);
+  };
+
+  const handleCreateRoom = () => {
+    if (turmaSelecionada && senha) {
+      if (salas[turmaSelecionada]) {
+        alert('Essa sala já existe.');
+        return;
+      }
+
+      setSalas((prev) => ({
+        ...prev,
+        [turmaSelecionada]: {
+          senha,
+          alunos: []
+        }
+      }));
+      setLoggedIn(true);
+    } else {
+      alert('Preencha o nome da sala e a senha');
+    }
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handleLogin();
+    }
   };
 
   return (
@@ -70,39 +111,77 @@ function App() {
             </button>
           </div>
 
-          {userType === 'aluno' && (
-            <select
-              value={turmaSelecionada}
-              onChange={(e) => setTurmaSelecionada(e.target.value)}
-              className="w-full p-2 border"
-            >
-              <option value="">Selecione a turma</option>
-              <option value="turmaA">Turma A</option>
-              <option value="turmaB">Turma B</option>
-              <option value="turmaC">Turma C</option>
-            </select>
+          {userType === 'professor' && (
+            <div className="space-y-2">
+              <input
+                type="text"
+                placeholder="Nome da nova sala"
+                value={turmaSelecionada}
+                onChange={(e) => setTurmaSelecionada(e.target.value)}
+                className="w-full p-2 border"
+              />
+              <input
+                type="password"
+                placeholder="Defina uma senha para a sala"
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
+                className="w-full p-2 border"
+              />
+              <button
+                onClick={handleCreateRoom}
+                className="w-full bg-blue-600 text-white p-2 rounded"
+              >
+                Criar Sala
+              </button>
+            </div>
           )}
 
-          <input
-            type="password"
-            placeholder="Digite a senha"
-            value={senha}
-            onChange={(e) => setSenha(e.target.value)}
-            className="w-full p-2 border"
-          />
+          {userType === 'aluno' && (
+            <>
+              <select
+                value={turmaSelecionada}
+                onChange={(e) => setTurmaSelecionada(e.target.value)}
+                className="w-full p-2 border"
+              >
+                <option value="">Selecione a turma</option>
+                {Object.keys(salas).map((turma) => (
+                  <option key={turma} value={turma}>
+                    {turma}
+                  </option>
+                ))}
+              </select>
 
-          <button
-            onClick={handleLogin}
-            className="w-full bg-blue-500 text-white p-2 rounded"
-          >
-            Entrar
-          </button>
+              <input
+                type="text"
+                placeholder="Digite seu nome"
+                value={nomeAluno}
+                onChange={(e) => setNomeAluno(e.target.value)}
+                className="w-full p-2 border"
+              />
+
+              <input
+                type="password"
+                placeholder="Digite a senha"
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
+                onKeyDown={handleKeyPress}
+                className="w-full p-2 border"
+              />
+
+              <button
+                onClick={handleLogin}
+                className="w-full bg-green-600 text-white p-2 rounded"
+              >
+                Entrar
+              </button>
+            </>
+          )}
         </div>
       ) : (
         <>
           <div className="flex justify-between items-center mb-4">
             <span className="text-sm">
-              Logado como: {userType === 'professor' ? 'Professor' : `Aluno - ${turmaSelecionada}`}
+              Logado como: {userType === 'professor' ? 'Professor' : `Aluno - ${nomeAluno} (${turmaSelecionada})`}
             </span>
             <button
               onClick={handleLogout}
@@ -113,22 +192,20 @@ function App() {
           </div>
 
           {userType === 'professor' && (
-            <ImageUpload onUpload={setImageURL} />
+            <ProfessorPage
+              imageURL={imageURL}
+              salas={salas}
+              turmaSelecionada={turmaSelecionada}
+            />
           )}
-
-          {imageURL && (
-            <>
-              <img
-                src={imageURL}
-                alt="Imagem enviada pelo professor"
-                className="my-4 rounded-lg shadow-md w-full max-h-[400px] object-contain"
-              />
-              <EssayForm />
-            </>
-          )}
-
-          {userType === 'aluno' && !imageURL && (
-            <p className="text-center text-gray-600">Aguardando o professor enviar a imagem...</p>
+          {userType === 'aluno' && (
+            <AlunoPage
+              imageURL={imageURL}
+              nomeAluno={nomeAluno}
+              turmaSelecionada={turmaSelecionada}
+              salas={salas}
+              setSalas={setSalas}
+            />
           )}
         </>
       )}
@@ -137,4 +214,3 @@ function App() {
 }
 
 export default App;
- 
